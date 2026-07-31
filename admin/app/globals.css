@@ -4,10 +4,12 @@ body { margin: 0; }
 main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .muted { color: #6b7280; }
-.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
 .card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px #1720330a; }
 .card form { display: grid; gap: 12px; }
 .notice { margin-bottom: 16px; }
+.toast { position: fixed; top: 22px; right: 22px; z-index: 20; max-width: 360px; padding: 12px 16px; border-radius: 10px; color: white; box-shadow: 0 8px 24px #17203326; font-size: 14px; }
+.toast-success { background: #177245; }
+.toast-error { background: #b42318; }
 .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; }
 .form-actions { display: flex; align-items: end; gap: 8px; }
 .full-width { grid-column: 1 / -1; }
@@ -18,12 +20,10 @@ label { display: grid; gap: 6px; font-weight: 600; }
 input, button { font: inherit; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; }
 button { cursor: pointer; background: #172033; color: white; border: 0; }
 button:disabled { opacity: .6; cursor: wait; }
-.value { font-size: 28px; font-weight: 700; margin-top: 8px; }
 .section { margin-top: 24px; }
 table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; }
 th, td { text-align: left; padding: 14px; border-bottom: 1px solid #eef0f4; }
 th { background: #f8fafc; }
-@media (max-width: 800px) { .grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 800px) { .form-grid { grid-template-columns: 1fr; } }
 .admin-tabs { display: flex; gap: 8px; border-bottom: 1px solid #e5e7eb; margin: 0 0 20px; }
 .admin-tabs button { background: transparent; color: #6b7280; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 16px; }
@@ -46,5 +46,23 @@ th { background: #f8fafc; }
 .user-meta { display: grid; gap: 4px; min-width: 110px; border-left: 1px solid #eef0f4; padding-left: 12px; }
 .user-meta small { color: #9ca3af; font-size: 10px; }
 .user-meta strong { font-size: 12px; margin-bottom: 5px; }
+.partner-form { grid-template-columns: repeat(4, 1fr); }
+.supply-fieldset { border: 1px solid #e5e7eb; border-radius: 8px; display: flex; gap: 16px; flex-wrap: wrap; padding: 12px; }
+.supply-fieldset label { display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.partners-view > .section:not(:first-of-type) { display: none; }
+.settings-partners > .section:not(:first-of-type) { display: none; }
+.inline-partner-panel td input, .inline-partner-panel td select { width: 100%; min-width: 90px; margin-bottom: 5px; }
+.inline-partner-panel td button { margin: 2px; }
+.inline-check { display: flex; align-items: center; gap: 5px; font-weight: 400; white-space: nowrap; }
+.settings-partners:not(.partner-form-open) .partner-form { display: none; }
+.partner-add-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
+.partner-add-bar h2 { margin: 0; }
+.settings-partners > .section:first-of-type:not(.inline-partner-panel) > .section-title-row { display: none; }
+.settings-tabs { display: flex; gap: 8px; margin: 0 0 20px; }
+.settings-tabs button { background: white; color: #6b7280; border: 1px solid #e5e7eb; }
+.settings-tabs button.active { background: #172033; color: white; }
+.settings-tabs.partner-tabs { gap: 0; border-bottom: 1px solid #e5e7eb; margin-top: 8px; }
+.settings-tabs.partner-tabs button { background: transparent; color: #64748b; border: 0; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 16px; }
+.settings-tabs.partner-tabs button.active { background: transparent; color: #172033; border-bottom-color: #172033; font-weight: 700; }
 @media (max-width: 950px) { .user-cards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 650px) { .user-cards { grid-template-columns: 1fr; } .user-card { flex-wrap: wrap; } .user-meta { width: 100%; border-left: 0; border-top: 1px solid #eef0f4; padding: 12px 0 0; grid-template-columns: 1fr 1fr; } }

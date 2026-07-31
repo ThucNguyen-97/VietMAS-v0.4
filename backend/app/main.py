@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .auth import current_user, login, require_roles, seed_users
@@ -16,6 +16,11 @@ from .models import (
     InventoryItem,
     InventoryTransaction,
     Message,
+    Partner,
+    PartnerSupply,
+    PartnerHistory,
+    PartnerStatus,
+    PartnerType,
     Role,
     TransactionType,
     User,
@@ -34,6 +39,9 @@ from .schemas import (
     TransactionCreate,
     TransactionResponse,
     UserResponse,
+    PartnerBase,
+    PartnerResponse,
+    PartnerHistoryResponse,
 )
 
 app = FastAPI(title="VietMAS Inventory Chatbot API", version="0.1.0")
@@ -88,6 +96,46 @@ def startup() -> None:
                     }, ensure_ascii=False),
                 ))
                 db.commit()
+        seed_partners(db)
+        for partner in db.scalars(select(Partner).where(Partner.partner_type != PartnerType.VENDOR)).all():
+            if partner.supplies:
+                partner.supplies.clear()
+        db.commit()
+        if not db.scalar(select(PartnerHistory).limit(1)):
+            admin = db.scalar(select(User).where(User.role == Role.ADMIN).order_by(User.id).limit(1))
+            if admin:
+                for partner in db.scalars(select(Partner)).all():
+                    add_partner_history(db, partner, admin.id, "created")
+                db.commit()
+
+
+def seed_partners(db: Session) -> None:
+    if db.scalar(select(Partner).limit(1)):
+        return
+    admin = db.scalar(select(User).where(User.role == Role.ADMIN).order_by(User.id).limit(1))
+    if not admin:
+        return
+    items = {item.sku: item for item in db.scalars(select(InventoryItem)).all()}
+    samples = [
+        ("Công ty TNHH Nhà hàng Biển Xanh", "Biển Xanh", PartnerType.CUSTOMER, "0311000001", "Trần Hải Nam", "TP. Hồ Chí Minh", "0901000001", "contact@bienxanh.vn", []),
+        ("Công ty CP Thực phẩm An Việt", "An Việt", PartnerType.CUSTOMER, "0101000002", "Lê Thu Hà", "Hà Nội", "0901000002", "hello@anviet.vn", []),
+        ("Công ty TNHH Muối Ninh Thuận", "Muối Ninh Thuận", PartnerType.VENDOR, "4501000003", "Nguyễn Văn Sơn", "Ninh Thuận", "0901000003", "sales@muoininhthuan.vn", ["RM-SALT"]),
+        ("Công ty TNHH Ớt Việt", "Ớt Việt", PartnerType.VENDOR, "3701000004", "Phạm Minh Đức", "Bình Dương", "0901000004", "sales@otviet.vn", ["RM-CHILI"]),
+        ("Công ty CP Nông sản Việt Tâm", "Việt Tâm", PartnerType.VENDOR, "0101000005", "Đỗ Ngọc Lan", "Hà Nội", "0901000005", "sales@viettam.vn", ["RM-SALT", "RM-CHILI"]),
+        ("Công ty TNHH VietMAS", "VietMAS", PartnerType.SERVICE, "0100000000", "Nguyễn Minh An", "Hà Nội", "024 7300 2026", "contact@vietmas.local", []),
+    ]
+    for legal_name, short_name, kind, tax_code, representative, address, phone, email, supply_skus in samples:
+        partner = Partner(legal_name=legal_name, short_name=short_name, partner_type=kind, tax_code=tax_code,
+                          legal_representative=representative, address=address, phone=phone, email=email,
+                          status=PartnerStatus.ACTIVE, created_by_id=admin.id)
+        db.add(partner)
+        db.flush()
+        for sku in supply_skus:
+            if sku in items:
+                db.add(PartnerSupply(partner_id=partner.id, inventory_item_id=items[sku].id))
+        db.flush()
+        add_partner_history(db, partner, admin.id, "created")
+    db.commit()
 
 
 @app.get("/health")
@@ -254,6 +302,111 @@ def get_inventory(item_id: int, db: Session = Depends(get_db), _: object = Depen
     return item
 
 
+def partner_response(partner: Partner) -> dict:
+    return {**{key: getattr(partner, key) for key in (
+        "id", "legal_name", "short_name", "partner_type", "tax_code", "legal_representative", "address",
+        "phone", "email", "logo_url", "status", "created_by_id", "created_at", "updated_at")},
+        "supply_item_ids": [s.inventory_item_id for s in partner.supplies]}
+
+
+def partner_snapshot(partner: Partner) -> dict:
+    data = partner_response(partner)
+    return data
+
+
+def add_partner_history(db: Session, partner: Partner, user_id: int, action: str) -> None:
+    db.add(PartnerHistory(
+        partner_id=partner.id,
+        changed_by_id=user_id,
+        action=action,
+        snapshot_json=json.dumps(partner_snapshot(partner), default=str, ensure_ascii=False),
+    ))
+
+
+@app.get("/partners", response_model=list[PartnerResponse])
+def list_partners(db: Session = Depends(get_db), _: object = Depends(current_user)):
+    return [partner_response(p) for p in db.scalars(select(Partner).order_by(Partner.partner_type, Partner.legal_name)).all()]
+
+
+@app.get("/partners/history", response_model=list[PartnerHistoryResponse])
+def list_partner_history(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
+    history = list(db.scalars(select(PartnerHistory).order_by(PartnerHistory.changed_at.desc())).all())
+    return [{"id": h.id, "action": h.action, "changed_by_id": h.changed_by_id, "changed_at": h.changed_at, "snapshot": h.snapshot()} for h in history]
+
+
+@app.delete("/partners/history")
+def clear_partner_history(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
+    deleted = db.query(PartnerHistory).delete()
+    db.commit()
+    return {"status": "deleted", "deleted_count": deleted}
+
+
+@app.get("/partners/{partner_id}", response_model=PartnerResponse)
+def get_partner(partner_id: int, db: Session = Depends(get_db), _: object = Depends(current_user)):
+    partner = db.get(Partner, partner_id)
+    if not partner:
+        raise HTTPException(404, "Không tìm thấy đối tác")
+    return partner_response(partner)
+
+
+@app.post("/partners", response_model=PartnerResponse)
+def create_partner(payload: PartnerBase, db: Session = Depends(get_db), user=Depends(require_roles(Role.ADMIN, Role.CEO))):
+    if db.scalar(select(Partner).where(Partner.tax_code == payload.tax_code)):
+        raise HTTPException(409, "Mã số thuế đối tác đã tồn tại")
+    if payload.partner_type != PartnerType.VENDOR:
+        payload.supply_item_ids = []
+    partner = Partner(**payload.model_dump(exclude={"supply_item_ids"}), created_by_id=user.user_id)
+    db.add(partner)
+    db.flush()
+    for item_id in set(payload.supply_item_ids):
+        item = db.get(InventoryItem, item_id)
+        if not item or not item.is_active:
+            raise HTTPException(400, "Vật tư cung cấp không tồn tại hoặc đã ngừng sử dụng")
+        db.add(PartnerSupply(partner_id=partner.id, inventory_item_id=item_id))
+    db.commit()
+    db.refresh(partner)
+    add_partner_history(db, partner, user.user_id, "created")
+    db.commit()
+    return partner_response(partner)
+
+
+@app.put("/partners/{partner_id}", response_model=PartnerResponse)
+def update_partner(partner_id: int, payload: PartnerBase, db: Session = Depends(get_db), user=Depends(require_roles(Role.ADMIN, Role.CEO))):
+    partner = db.get(Partner, partner_id)
+    if not partner:
+        raise HTTPException(404, "Không tìm thấy đối tác")
+    duplicate = db.scalar(select(Partner).where(Partner.tax_code == payload.tax_code, Partner.id != partner_id))
+    if duplicate:
+        raise HTTPException(409, "Mã số thuế đối tác đã tồn tại")
+    if payload.partner_type != PartnerType.VENDOR:
+        payload.supply_item_ids = []
+    for key, value in payload.model_dump(exclude={"supply_item_ids"}).items():
+        setattr(partner, key, value)
+    partner.supplies.clear()
+    for item_id in set(payload.supply_item_ids):
+        item = db.get(InventoryItem, item_id)
+        if not item or not item.is_active:
+            raise HTTPException(400, "Vật tư cung cấp không tồn tại hoặc đã ngừng sử dụng")
+        partner.supplies.append(PartnerSupply(inventory_item_id=item_id))
+    db.commit()
+    db.refresh(partner)
+    add_partner_history(db, partner, user.user_id, "updated")
+    db.commit()
+    return partner_response(partner)
+
+
+@app.delete("/partners/{partner_id}")
+def delete_partner(partner_id: int, db: Session = Depends(get_db), user=Depends(require_roles(Role.ADMIN, Role.CEO))):
+    partner = db.get(Partner, partner_id)
+    if not partner:
+        raise HTTPException(404, "Không tìm thấy đối tác")
+    partner.status = PartnerStatus.INACTIVE
+    db.commit()
+    add_partner_history(db, partner, user.user_id, "deleted")
+    db.commit()
+    return {"status": "deleted"}
+
+
 @app.post("/chat/message", response_model=ChatResponse)
 def chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(current_user)):
     conversation = db.get(Conversation, payload.conversation_id) if payload.conversation_id else None
@@ -273,13 +426,3 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(curre
 @app.get("/admin/users", response_model=list[UserResponse])
 def admin_users(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
     return list(db.scalars(select(User).order_by(User.username)).all())
-
-
-@app.get("/admin/statistics")
-def statistics(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
-    return {
-        "users": db.scalar(select(func.count(User.id))) or 0,
-        "inventory_items": db.scalar(select(func.count(InventoryItem.id)).where(InventoryItem.is_active.is_(True))) or 0,
-        "inventory_transactions": db.scalar(select(func.count(InventoryTransaction.id))) or 0,
-        "questions": db.scalar(select(func.count(Message.id)).where(Message.sender == "user")) or 0,
-    }

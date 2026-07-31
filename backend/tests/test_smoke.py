@@ -22,6 +22,12 @@ def test_roles_and_inventory_rules():
         admin_headers = {"Authorization": f"Bearer {admin.json()['access_token']}"}
         manager_headers = {"Authorization": f"Bearer {manager.json()['access_token']}"}
 
+        partners = client.get("/partners", headers=manager_headers)
+        assert partners.status_code == 200
+        assert len(partners.json()) == 6
+        assert sum(p["partner_type"] == "vendor" for p in partners.json()) == 3
+        assert client.post("/partners", headers=manager_headers, json={"legal_name": "No", "partner_type": "customer", "tax_code": "999"}).status_code == 403
+
         profile = client.put(
             "/company-profile",
             headers=admin_headers,

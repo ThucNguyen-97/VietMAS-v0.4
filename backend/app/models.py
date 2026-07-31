@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 import json
 from enum import Enum
 
-from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -16,6 +16,17 @@ class Role(str, Enum):
     ADMIN = "admin"
     CEO = "ceo"
     MANAGER = "manager"
+
+
+class PartnerType(str, Enum):
+    CUSTOMER = "customer"
+    VENDOR = "vendor"
+    SERVICE = "service"
+
+
+class PartnerStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
 
 
 class CompanyProfile(Base):
@@ -69,6 +80,52 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     transactions: Mapped[list["InventoryTransaction"]] = relationship(back_populates="created_by")
+
+
+class Partner(Base):
+    __tablename__ = "partners"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    legal_name: Mapped[str] = mapped_column(String(255), index=True)
+    short_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    partner_type: Mapped[PartnerType] = mapped_column(SAEnum(PartnerType), index=True)
+    tax_code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    legal_representative: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[PartnerStatus] = mapped_column(SAEnum(PartnerStatus), default=PartnerStatus.ACTIVE, index=True)
+    created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    created_by: Mapped[User] = relationship(foreign_keys=[created_by_id])
+    supplies: Mapped[list["PartnerSupply"]] = relationship(back_populates="partner", cascade="all, delete-orphan")
+
+
+class PartnerSupply(Base):
+    __tablename__ = "partner_supplies"
+    __table_args__ = (UniqueConstraint("partner_id", "inventory_item_id", name="uq_partner_supply"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id"), index=True)
+    inventory_item_id: Mapped[int] = mapped_column(ForeignKey("inventory_items.id"), index=True)
+    partner: Mapped[Partner] = relationship(back_populates="supplies")
+    inventory_item: Mapped["InventoryItem"] = relationship()
+
+
+class PartnerHistory(Base):
+    __tablename__ = "partner_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    partner_id: Mapped[int] = mapped_column(ForeignKey("partners.id"), index=True)
+    changed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(20), default="updated")
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    def snapshot(self) -> dict:
+        return json.loads(self.snapshot_json)
 
 
 class InventoryItem(Base):

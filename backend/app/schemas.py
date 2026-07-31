@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import InventoryCategory, Role, TransactionType
+from .models import InventoryCategory, PartnerStatus, PartnerType, Role, TransactionType
 
 
 class LoginRequest(BaseModel):
@@ -73,6 +73,36 @@ class InventoryResponse(InventoryCreate):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PartnerBase(BaseModel):
+    legal_name: str = Field(min_length=1, max_length=255)
+    short_name: str | None = Field(default=None, max_length=120)
+    partner_type: PartnerType
+    tax_code: str = Field(min_length=1, max_length=30)
+    legal_representative: str | None = Field(default=None, max_length=160)
+    address: str | None = None
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=160)
+    logo_url: str | None = Field(default=None, max_length=500)
+    status: PartnerStatus = PartnerStatus.ACTIVE
+    supply_item_ids: list[int] = Field(default_factory=list)
+
+
+class PartnerResponse(PartnerBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_by_id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class PartnerHistoryResponse(BaseModel):
+    id: int
+    action: str
+    changed_by_id: int
+    changed_at: datetime
+    snapshot: PartnerBase
 
 
 class TransactionCreate(BaseModel):
