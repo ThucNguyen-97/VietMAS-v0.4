@@ -64,5 +64,14 @@ th { background: #f8fafc; }
 .settings-tabs.partner-tabs { gap: 0; border-bottom: 1px solid #e5e7eb; margin-top: 8px; }
 .settings-tabs.partner-tabs button { background: transparent; color: #64748b; border: 0; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 16px; }
 .settings-tabs.partner-tabs button.active { background: transparent; color: #172033; border-bottom-color: #172033; font-weight: 700; }
+.settings-tabs.company-tabs { gap: 0; border-bottom: 1px solid #e5e7eb; margin-top: 8px; }
+.settings-tabs.company-tabs button { background: transparent; color: #64748b; border: 0; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px; }
+.settings-tabs.company-tabs button.active { background: transparent; color: #172033; border-bottom-color: #172033; font-weight: 700; }
+.settings-company > .section:first-of-type > .section-title-row { display: none; }
+.settings-company .history-panel { display: none; }
+.company-tab-history > .section:not(.company-history-panel) { display: none; }
+.company-history-panel { overflow-x: auto; }
+.company-history-panel table { min-width: 980px; }
+.company-history-panel th { white-space: nowrap; }
 @media (max-width: 950px) { .user-cards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 650px) { .user-cards { grid-template-columns: 1fr; } .user-card { flex-wrap: wrap; } .user-meta { width: 100%; border-left: 0; border-top: 1px solid #eef0f4; padding: 12px 0 0; grid-template-columns: 1fr 1fr; } }
