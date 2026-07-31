@@ -353,8 +353,8 @@ def get_partner(partner_id: int, db: Session = Depends(get_db), _: object = Depe
 def create_partner(payload: PartnerBase, db: Session = Depends(get_db), user=Depends(require_roles(Role.ADMIN, Role.CEO))):
     if db.scalar(select(Partner).where(Partner.tax_code == payload.tax_code)):
         raise HTTPException(409, "Mã số thuế đối tác đã tồn tại")
-    if payload.partner_type != PartnerType.VENDOR:
-        payload.supply_item_ids = []
+    if payload.partner_type != PartnerType.VENDOR and payload.supply_item_ids:
+        raise HTTPException(400, "Chỉ vendor được khai báo vật tư cung cấp")
     partner = Partner(**payload.model_dump(exclude={"supply_item_ids"}), created_by_id=user.user_id)
     db.add(partner)
     db.flush()
@@ -378,16 +378,17 @@ def update_partner(partner_id: int, payload: PartnerBase, db: Session = Depends(
     duplicate = db.scalar(select(Partner).where(Partner.tax_code == payload.tax_code, Partner.id != partner_id))
     if duplicate:
         raise HTTPException(409, "Mã số thuế đối tác đã tồn tại")
-    if payload.partner_type != PartnerType.VENDOR:
-        payload.supply_item_ids = []
+    if payload.partner_type != PartnerType.VENDOR and payload.supply_item_ids:
+        raise HTTPException(400, "Chỉ vendor được khai báo vật tư cung cấp")
     for key, value in payload.model_dump(exclude={"supply_item_ids"}).items():
         setattr(partner, key, value)
-    partner.supplies.clear()
+    db.query(PartnerSupply).filter(PartnerSupply.partner_id == partner_id).delete(synchronize_session=False)
+    db.flush()
     for item_id in set(payload.supply_item_ids):
         item = db.get(InventoryItem, item_id)
         if not item or not item.is_active:
             raise HTTPException(400, "Vật tư cung cấp không tồn tại hoặc đã ngừng sử dụng")
-        partner.supplies.append(PartnerSupply(inventory_item_id=item_id))
+        db.add(PartnerSupply(partner_id=partner_id, inventory_item_id=item_id))
     db.commit()
     db.refresh(partner)
     add_partner_history(db, partner, user.user_id, "updated")
