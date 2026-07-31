@@ -1,0 +1,8 @@
+backend/.env
+backend/*.db
+backend/**/__pycache__/
+admin/node_modules/
+admin/.next/
+mobile/.dart_tool/
+mobile/build/
+
