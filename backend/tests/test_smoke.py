@@ -22,6 +22,33 @@ def test_roles_and_inventory_rules():
         admin_headers = {"Authorization": f"Bearer {admin.json()['access_token']}"}
         manager_headers = {"Authorization": f"Bearer {manager.json()['access_token']}"}
 
+        profile = client.put(
+            "/company-profile",
+            headers=admin_headers,
+            json={
+                "legal_name": "Công ty VietMAS",
+                "short_name": "VietMAS",
+                "tax_code": "0123456789",
+                "address": "Hà Nội",
+            },
+        )
+        assert profile.status_code == 200
+        assert client.get("/company-profile", headers=manager_headers).json()["tax_code"] == "0123456789"
+        unchanged = client.put(
+            "/company-profile",
+            headers=admin_headers,
+            json={
+                "legal_name": "Công ty VietMAS",
+                "short_name": "VietMAS",
+                "tax_code": "0123456789",
+                "address": "Hà Nội",
+            },
+        )
+        assert unchanged.status_code == 200
+        history = client.get("/company-profile/history", headers=admin_headers)
+        assert history.status_code == 200
+        assert len(history.json()) == 1
+
         items = client.get("/inventory", headers=admin_headers).json()
         assert len(items) == 2
         item_id = items[0]["id"]

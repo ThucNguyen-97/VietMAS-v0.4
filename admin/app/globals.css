@@ -10,6 +10,10 @@ main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
 .notice { margin-bottom: 16px; }
 .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; }
 .form-actions { display: flex; align-items: end; gap: 8px; }
+.full-width { grid-column: 1 / -1; }
+.company-form { grid-template-columns: repeat(2, 1fr); }
+.history-panel { margin-top: 24px; }
+.history-panel table { margin-top: 12px; }
 label { display: grid; gap: 6px; font-weight: 600; }
 input, button { font: inherit; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; }
 button { cursor: pointer; background: #172033; color: white; border: 0; }

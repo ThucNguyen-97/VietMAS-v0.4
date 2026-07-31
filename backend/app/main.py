@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from .auth import current_user, login, require_roles, seed_users
 from .database import Base, SessionLocal, engine, get_db
 from .inventory_chat import chat_reply
+import json
+
 from .models import (
+    CompanyProfile,
+    CompanyProfileHistory,
     Conversation,
     InventoryCategory,
     InventoryItem,
@@ -19,6 +23,9 @@ from .models import (
 from .schemas import (
     ChatRequest,
     ChatResponse,
+    CompanyProfileBase,
+    CompanyProfileHistoryResponse,
+    CompanyProfileResponse,
     InventoryCreate,
     InventoryResponse,
     InventoryUpdate,
@@ -50,6 +57,37 @@ def startup() -> None:
                 InventoryItem(sku="RM-CHILI", name="Ớt", category=InventoryCategory.RAW_MATERIAL, unit="kg", low_stock_threshold=20),
             ])
             db.commit()
+        if not db.scalar(select(CompanyProfile).limit(1)):
+            profile = CompanyProfile(
+                legal_name="Công ty TNHH VietMAS Demo",
+                short_name="VietMAS",
+                tax_code="0100000000",
+                address="123 Đường Sản Xuất, Quận Cầu Giấy, Hà Nội",
+                phone="024 7300 2026",
+                email="contact@vietmas.local",
+                legal_representative="Nguyễn Minh An",
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            admin = db.scalar(select(User).where(User.role == Role.ADMIN).order_by(User.id).limit(1))
+            if admin:
+                db.add(CompanyProfileHistory(
+                    company_profile_id=profile.id,
+                    changed_by_id=admin.id,
+                    action="created",
+                    snapshot_json=json.dumps({
+                        "legal_name": profile.legal_name,
+                        "short_name": profile.short_name,
+                        "tax_code": profile.tax_code,
+                        "address": profile.address,
+                        "phone": profile.phone,
+                        "email": profile.email,
+                        "legal_representative": profile.legal_representative,
+                        "logo_url": profile.logo_url,
+                    }, ensure_ascii=False),
+                ))
+                db.commit()
 
 
 @app.get("/health")
@@ -69,6 +107,58 @@ def auth_login(payload: LoginRequest, db: Session = Depends(get_db)):
 @app.get("/users/me", response_model=UserResponse)
 def me(user=Depends(current_user), db: Session = Depends(get_db)):
     return db.get(User, user.user_id)
+
+
+@app.get("/company-profile", response_model=CompanyProfileResponse)
+def get_company_profile(db: Session = Depends(get_db), _: object = Depends(current_user)):
+    profile = db.scalar(select(CompanyProfile).order_by(CompanyProfile.id).limit(1))
+    if not profile:
+        raise HTTPException(404, "Chưa cấu hình thông tin công ty")
+    return profile
+
+
+@app.get("/company-profile/history", response_model=list[CompanyProfileHistoryResponse])
+def get_company_profile_history(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
+    history = list(db.scalars(select(CompanyProfileHistory).order_by(CompanyProfileHistory.changed_at.desc())).all())
+    return [
+        {
+            "id": entry.id,
+            "action": entry.action,
+            "changed_by_id": entry.changed_by_id,
+            "changed_at": entry.changed_at,
+            "snapshot": entry.snapshot(),
+        }
+        for entry in history
+    ]
+
+
+@app.put("/company-profile", response_model=CompanyProfileResponse)
+def upsert_company_profile(
+    payload: CompanyProfileBase,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles(Role.ADMIN, Role.CEO)),
+):
+    profile = db.scalar(select(CompanyProfile).order_by(CompanyProfile.id).limit(1))
+    is_new = profile is None
+    values = payload.model_dump(exclude={"id", "created_at", "updated_at"})
+    if profile and all(getattr(profile, key) == value for key, value in values.items()):
+        return profile
+    if profile:
+        for key, value in values.items():
+            setattr(profile, key, value)
+    else:
+        profile = CompanyProfile(**values)
+        db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    db.add(CompanyProfileHistory(
+        company_profile_id=profile.id,
+        changed_by_id=user.user_id,
+        action="created" if is_new else "updated",
+        snapshot_json=json.dumps(values, ensure_ascii=False),
+    ))
+    db.commit()
+    return profile
 
 
 @app.get("/inventory", response_model=list[InventoryResponse])

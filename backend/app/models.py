@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import json
 from enum import Enum
 
 from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text
@@ -15,6 +16,36 @@ class Role(str, Enum):
     ADMIN = "admin"
     CEO = "ceo"
     MANAGER = "manager"
+
+
+class CompanyProfile(Base):
+    __tablename__ = "company_profile"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    legal_name: Mapped[str] = mapped_column(String(255))
+    short_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    tax_code: Mapped[str] = mapped_column(String(30), unique=True, index=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    legal_representative: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class CompanyProfileHistory(Base):
+    __tablename__ = "company_profile_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    company_profile_id: Mapped[int] = mapped_column(ForeignKey("company_profile.id"), index=True)
+    changed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    action: Mapped[str] = mapped_column(String(20), default="updated")
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    def snapshot(self) -> dict[str, str | None]:
+        return json.loads(self.snapshot_json)
 
 
 class InventoryCategory(str, Enum):
@@ -90,4 +121,3 @@ class Message(Base):
     sender: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-

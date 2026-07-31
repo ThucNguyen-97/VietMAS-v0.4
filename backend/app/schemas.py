@@ -23,6 +23,32 @@ class LoginResponse(BaseModel):
     user: UserResponse
 
 
+class CompanyProfileBase(BaseModel):
+    legal_name: str = Field(min_length=1, max_length=255)
+    short_name: str | None = Field(default=None, max_length=120)
+    tax_code: str = Field(min_length=1, max_length=30)
+    address: str | None = None
+    phone: str | None = Field(default=None, max_length=30)
+    email: str | None = Field(default=None, max_length=160)
+    legal_representative: str | None = Field(default=None, max_length=160)
+    logo_url: str | None = Field(default=None, max_length=500)
+
+
+class CompanyProfileResponse(CompanyProfileBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+
+class CompanyProfileHistoryResponse(BaseModel):
+    id: int
+    action: str
+    changed_by_id: int
+    changed_at: datetime
+    snapshot: CompanyProfileBase
+
+
 class InventoryCreate(BaseModel):
     sku: str = Field(min_length=1, max_length=80)
     name: str = Field(min_length=1, max_length=160)
@@ -77,4 +103,3 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     conversation_id: int
     reply: str
-
