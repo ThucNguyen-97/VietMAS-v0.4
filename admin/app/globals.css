@@ -54,9 +54,8 @@ th { background: #f8fafc; }
 .inline-partner-panel td input, .inline-partner-panel td select { width: 100%; min-width: 90px; margin-bottom: 5px; }
 .inline-partner-panel td button { margin: 2px; }
 .inline-check { display: flex; align-items: center; gap: 5px; font-weight: 400; white-space: nowrap; }
-.settings-partners:not(.partner-form-open) .partner-form { display: none; }
-.partner-add-bar { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
-.partner-add-bar h2 { margin: 0; }
+.settings-partners .partner-form { max-height: 0; overflow: hidden; opacity: 0; margin-top: 0; padding-top: 0; padding-bottom: 0; border-width: 0; transition: max-height .25s ease, opacity .2s ease, margin-top .25s ease, padding .25s ease, border-width .25s ease; }
+.settings-partners.partner-form-open .partner-form { max-height: 1200px; opacity: 1; margin-top: 16px; padding-top: 18px; padding-bottom: 18px; border-width: 1px; }
 .settings-partners > .section:first-of-type:not(.inline-partner-panel) > .section-title-row { display: none; }
 .settings-tabs { display: flex; gap: 8px; margin: 0 0 20px; }
 .settings-tabs button { background: white; color: #6b7280; border: 1px solid #e5e7eb; }
@@ -64,6 +63,7 @@ th { background: #f8fafc; }
 .settings-tabs.partner-tabs { gap: 0; border-bottom: 1px solid #e5e7eb; margin-top: 8px; }
 .settings-tabs.partner-tabs button { background: transparent; color: #64748b; border: 0; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 16px; }
 .settings-tabs.partner-tabs button.active { background: transparent; color: #172033; border-bottom-color: #172033; font-weight: 700; }
+.settings-tabs.partner-tabs .partner-add-button { margin-left: auto; color: white; background: #172033; border: 0; border-radius: 8px; align-self: center; padding: 10px 14px; margin-bottom: 6px; }
 .settings-tabs.company-tabs { gap: 0; border-bottom: 1px solid #e5e7eb; margin-top: 8px; }
 .settings-tabs.company-tabs button { background: transparent; color: #64748b; border: 0; border-radius: 0; border-bottom: 3px solid transparent; padding: 12px 20px; }
 .settings-tabs.company-tabs button.active { background: transparent; color: #172033; border-bottom-color: #172033; font-weight: 700; }
