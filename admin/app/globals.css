@@ -73,5 +73,12 @@ th { background: #f8fafc; }
 .company-history-panel { overflow-x: auto; }
 .company-history-panel table { min-width: 980px; }
 .company-history-panel th { white-space: nowrap; }
+.partner-history-panel { overflow-x: auto; }
+.partner-history-panel table { min-width: 1120px; table-layout: fixed; }
+.partner-history-panel th { white-space: nowrap; }
+.partner-history-panel th:nth-child(1) { width: 180px; }
+.partner-history-panel th:nth-child(2) { width: 140px; }
+.partner-history-panel th:nth-child(3) { width: 180px; }
+.partner-history-panel th:nth-child(4), .partner-history-panel th:nth-child(5) { width: 310px; }
 @media (max-width: 950px) { .user-cards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 650px) { .user-cards { grid-template-columns: 1fr; } .user-card { flex-wrap: wrap; } .user-meta { width: 100%; border-left: 0; border-top: 1px solid #eef0f4; padding: 12px 0 0; grid-template-columns: 1fr 1fr; } }
