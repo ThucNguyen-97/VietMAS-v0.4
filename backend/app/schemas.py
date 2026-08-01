@@ -16,6 +16,7 @@ class UserResponse(BaseModel):
     username: str
     display_name: str
     role: Role
+    access_scope: str
 
 
 class LoginResponse(BaseModel):

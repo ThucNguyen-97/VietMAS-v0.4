@@ -22,14 +22,29 @@ _tokens: dict[str, SessionUser] = {}
 
 
 def seed_users(db: Session) -> None:
+    existing_users = {user.username: user for user in db.scalars(select(User)).all()}
+    legacy_manager = existing_users.get("manager")
+    renamed_manager = existing_users.get(settings.manager_username)
+    if legacy_manager and not renamed_manager and settings.manager_username != "manager":
+        legacy_manager.username = settings.manager_username
+        db.flush()
+    elif legacy_manager and renamed_manager and settings.manager_username != "manager":
+        legacy_manager.is_active = False
+
     accounts = [
-        (settings.admin_username, "Quản trị viên", Role.ADMIN),
-        (settings.ceo_username, "CEO", Role.CEO),
-        (settings.manager_username, "Quản lý kho", Role.MANAGER),
+        (settings.admin_username, "Quản trị viên", Role.ADMIN, "all"),
+        (settings.ceo_username, "CEO", Role.CEO, "all"),
+        (settings.manager_username, "Quản lý kho", Role.MANAGER, "warehouse"),
+        (settings.purchasing_manager_username, "Quản lý Thu mua", Role.MANAGER, "purchasing"),
     ]
-    for username, display_name, role in accounts:
-        if not db.scalar(select(User).where(User.username == username)):
-            db.add(User(username=username, display_name=display_name, role=role))
+    for username, display_name, role, access_scope in accounts:
+        user = db.scalar(select(User).where(User.username == username))
+        if not user:
+            db.add(User(username=username, display_name=display_name, role=role, access_scope=access_scope))
+        else:
+            user.display_name = display_name
+            user.role = role
+            user.access_scope = access_scope
     db.commit()
 
 
@@ -38,11 +53,12 @@ def login(db: Session, username: str, password: str) -> tuple[str, User] | None:
         settings.admin_username: (settings.admin_password, Role.ADMIN),
         settings.ceo_username: (settings.ceo_password, Role.CEO),
         settings.manager_username: (settings.manager_password, Role.MANAGER),
+        settings.purchasing_manager_username: (settings.purchasing_manager_password, Role.MANAGER),
     }
     account = accounts.get(username)
     if not account or not secrets.compare_digest(password, account[0]):
         return None
-    user = db.scalar(select(User).where(User.username == username))
+    user = db.scalar(select(User).where(User.username == username, User.is_active.is_(True)))
     if not user:
         return None
     token = secrets.token_urlsafe(32)
@@ -65,4 +81,3 @@ def require_roles(*roles: Role):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Bạn không có quyền thực hiện thao tác này")
         return user
     return dependency
-

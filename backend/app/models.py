@@ -77,6 +77,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(120))
     role: Mapped[Role] = mapped_column(SAEnum(Role), index=True)
+    access_scope: Mapped[str] = mapped_column(String(255), default="warehouse")
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     transactions: Mapped[list["InventoryTransaction"]] = relationship(back_populates="created_by")

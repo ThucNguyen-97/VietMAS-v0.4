@@ -62,6 +62,9 @@ app.add_middleware(
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
     with engine.begin() as connection:
+        user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
+        if "access_scope" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN access_scope VARCHAR(255) DEFAULT 'warehouse'"))
         existing_columns = {column["name"] for column in inspect(engine).get_columns("inventory_transactions")}
         migrations = {
             "vendor_id": "ALTER TABLE inventory_transactions ADD COLUMN vendor_id INTEGER",
@@ -616,4 +619,4 @@ def chat(payload: ChatRequest, db: Session = Depends(get_db), user=Depends(curre
 
 @app.get("/admin/users", response_model=list[UserResponse])
 def admin_users(db: Session = Depends(get_db), _: object = Depends(require_roles(Role.ADMIN, Role.CEO))):
-    return list(db.scalars(select(User).order_by(User.username)).all())
+    return list(db.scalars(select(User).order_by(User.id)).all())
