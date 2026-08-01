@@ -59,6 +59,7 @@ th { background: #f8fafc; }
 .purchase-order-inline-actions button { white-space: nowrap; }
 .purchase-order-history-panel > .section-title-row { display: none; }
 .purchase-order-audit-panel > .section-title-row p { display: none; }
+.users-panel > .section-title-row p { display: none; }
 .section-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .section-title-row h2 { margin: 0 0 6px; }
 .user-count { color: #6b7280; font-size: 13px; }
@@ -108,6 +109,47 @@ th { background: #f8fafc; }
 .icon-button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 7px; background: transparent; color: #64748b; font-size: 18px; }
 .icon-button:hover, .icon-button:focus-visible { background: #eef2f7; color: #172033; }
 .icon-button.danger:hover, .icon-button.danger:focus-visible { background: #fef2f2; color: #b42318; }
+.icon-button.danger span { font-size: 0; }
+.icon-button.danger span::after { content: "×"; font-size: 23px; line-height: 1; }
+.inventory-section tbody td:last-child { text-align: right; white-space: nowrap; vertical-align: middle; }
+.inventory-section tbody td:last-child button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 7px; background: transparent; color: #64748b; font-size: 0; opacity: 0; pointer-events: none; transition: opacity .15s ease, background .15s ease, color .15s ease; }
+.inventory-section tbody tr:hover td:last-child button, .inventory-section tbody td:last-child button:focus-visible { opacity: 1; pointer-events: auto; }
+.inventory-section tbody td:last-child button:first-child::after { content: "✎"; font-size: 18px; }
+.inventory-section tbody td:last-child button:last-child::after { content: "×"; font-size: 23px; line-height: 1; }
+.inventory-section tbody td:last-child button:hover, .inventory-section tbody td:last-child button:focus-visible { background: #eef2f7; color: #172033; }
+.inventory-section tbody td:last-child button:last-child:hover, .inventory-section tbody td:last-child button:last-child:focus-visible { background: #fef2f2; color: #b42318; }
+.purchase-order-history-panel table tbody td:last-child { text-align: right; white-space: nowrap; vertical-align: middle; }
+.purchase-order-history-panel table tbody td:last-child button { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; margin-left: 4px; border-radius: 7px; background: transparent; color: #64748b; font-size: 0; opacity: 0; pointer-events: none; transition: opacity .15s ease, background .15s ease, color .15s ease; }
+.purchase-order-history-panel table tbody tr:hover td:last-child button, .purchase-order-history-panel table tbody td:last-child button:focus-visible { opacity: 1; pointer-events: auto; }
+.purchase-order-history-panel table tbody td:last-child button:first-child::after { content: "✎"; font-size: 18px; }
+.purchase-order-history-panel table tbody td:last-child button:last-child::after { content: "×"; font-size: 23px; line-height: 1; }
+.purchase-order-history-panel table tbody td:last-child button:hover, .purchase-order-history-panel table tbody td:last-child button:focus-visible { background: #eef2f7; color: #172033; }
+.purchase-order-history-panel table tbody td:last-child button:last-child:hover, .purchase-order-history-panel table tbody td:last-child button:last-child:focus-visible { background: #fef2f2; color: #b42318; }
+.inventory-section tbody tr, .purchase-order-history-panel > table:first-of-type tbody tr { cursor: pointer; }
+.inventory-section tbody tr:hover, .purchase-order-history-panel > table:first-of-type tbody tr:hover { background: #f8fafc; }
+.inventory-section tbody td:last-child, .purchase-order-history-panel > table:first-of-type tbody td:last-child { vertical-align: middle; line-height: 1; }
+.inventory-section tbody td:last-child button, .purchase-order-history-panel > table:first-of-type tbody td:last-child button { vertical-align: middle; line-height: 1; margin: 0 0 0 4px; cursor: pointer; }
+.inventory-detail-row, .purchase-order-detail-row { background: #f8fafc; }
+.inventory-detail-row td, .purchase-order-detail-row td { padding: 0; border-bottom: 1px solid #eef0f4; background: #f8fafc; vertical-align: middle; }
+.inline-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; padding: 18px 20px; border-top: 1px solid #eef0f4; background: #f8fafc; text-align: left; }
+.inline-detail-grid > div { min-width: 0; }
+.inline-detail-grid span, .inline-detail-grid strong, .inline-detail-grid a { display: block; }
+.inline-detail-grid span { color: #6b7280; font-size: 12px; margin-bottom: 4px; }
+.inline-detail-grid strong, .inline-detail-grid a { color: #475569; font-size: 13px; font-weight: 400; line-height: 1.45; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .inline-detail-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .inline-detail-grid { grid-template-columns: 1fr; } }
+.detail-backdrop { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 24px; background: #17203366; }
+.detail-card { width: min(620px, 100%); max-height: min(720px, 90vh); overflow: auto; background: white; border-radius: 14px; padding: 22px; box-shadow: 0 20px 60px #17203340; }
+.detail-card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.detail-card-header h2 { margin: 0; }
+.detail-close { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 7px; background: transparent; color: #64748b; font-size: 24px; line-height: 1; }
+.detail-close:hover, .detail-close:focus-visible { background: #fef2f2; color: #b42318; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.detail-grid > div { display: grid; gap: 5px; }
+.detail-grid span { color: #6b7280; font-size: 12px; }
+.detail-grid strong, .detail-grid a { color: #172033; overflow-wrap: anywhere; }
+.detail-wide { grid-column: 1 / -1; }
+@media (max-width: 600px) { .detail-grid { grid-template-columns: 1fr; } .detail-wide { grid-column: auto; } }
 .expand-icon { display: inline-block; line-height: 1; transform: translateY(-2px); transition: transform .15s ease; }
 .expand-icon.expanded { transform: rotate(180deg) translateY(2px); }
 .partner-details-row td { padding: 0; background: #f8fafc; }

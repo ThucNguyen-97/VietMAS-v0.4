@@ -10,6 +10,16 @@ const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const suggestions = ["Kho còn bao nhiêu muối?", "Nhập 50 kg ớt", "Xuất 10 kg muối", "Mặt hàng nào sắp hết?"];
 
 export default function UserPortal() {
+  useEffect(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) textNodes.push(node as Text);
+    textNodes.forEach((textNode) => {
+      if (textNode.nodeValue?.includes("Kho vận")) textNode.nodeValue = textNode.nodeValue.replaceAll("Kho vận", "Tồn kho");
+    });
+  });
+
   const [token, setToken] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [username, setUsername] = useState("thukho");

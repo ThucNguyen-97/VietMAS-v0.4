@@ -14,6 +14,16 @@ type PartnerHistory = { id: number; action: string; changed_by_id: number; chang
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function Dashboard() {
+  useEffect(() => {
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    const textNodes: Text[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) textNodes.push(node as Text);
+    textNodes.forEach((textNode) => {
+      if (textNode.nodeValue?.includes("Kho vận")) textNode.nodeValue = textNode.nodeValue.replaceAll("Kho vận", "Tồn kho");
+    });
+  });
+
   const [items, setItems] = useState<Item[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [purchaseOrderHistory, setPurchaseOrderHistory] = useState<PurchaseOrderHistory[]>([]);
@@ -36,13 +46,15 @@ export default function Dashboard() {
   const [selectedPurchaseVendorId, setSelectedPurchaseVendorId] = useState("");
   const [editingPurchaseOrder, setEditingPurchaseOrder] = useState<Transaction | null>(null);
   const [activeTab, setActiveTab] = useState<"warehouse" | "users" | "settings">("warehouse");
-  const [warehouseTab, setWarehouseTab] = useState<"transactions" | "inventory">("transactions");
+  const [warehouseTab, setWarehouseTab] = useState<"transactions" | "inventory">("inventory");
   const [settingsTab, setSettingsTab] = useState<"company" | "partners">("company");
   const [companyTab, setCompanyTab] = useState<"info" | "history">("info");
   const [partnerTab, setPartnerTab] = useState<"list" | "history">("list");
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [showPartnerForm, setShowPartnerForm] = useState(false);
   const [expandedPartnerIds, setExpandedPartnerIds] = useState<number[]>([]);
+  const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<Transaction | null>(null);
 
   useEffect(() => {
     if (editingPurchaseOrder && !showPurchaseOrderForm) {
@@ -59,6 +71,47 @@ export default function Dashboard() {
   useEffect(() => {
     document.querySelectorAll<HTMLInputElement>('input[name="note"]').forEach((input) => input.removeAttribute("required"));
   }, [showPurchaseOrderForm, editingPurchaseOrder]);
+
+  useEffect(() => {
+    const escapeHtml = (value: string) => value.replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\\\"": "&quot;", "'": "&#039;" } as Record<string, string>)[character]);
+    const closeDetails = (row: HTMLTableRowElement) => { const detail = row.nextElementSibling; if (detail?.classList.contains("inventory-detail-row") || detail?.classList.contains("purchase-order-detail-row")) { detail.remove(); return true; } return false; };
+    const itemRows = Array.from(document.querySelectorAll<HTMLTableRowElement>(".inventory-section table tbody tr"));
+    const orderRows = Array.from(document.querySelectorAll<HTMLTableRowElement>(".purchase-order-history-panel > table:first-of-type tbody tr"));
+    const itemHandlers = itemRows.map((row) => {
+      const handler = (event: Event) => {
+        if ((event.target as HTMLElement).closest("button, a")) return;
+        if (closeDetails(row)) return;
+        const item = items.find((candidate) => candidate.sku === row.cells[0]?.textContent?.trim());
+        if (!item) return;
+        const detail = document.createElement("tr");
+        detail.className = "inventory-detail-row";
+        detail.innerHTML = `<td colSpan="6"><div class="inline-detail-grid"><div><span>Ghi chú</span><strong>${escapeHtml(item.packaging_note || "—")}</strong></div><div><span>Ngưỡng cảnh báo</span><strong>${item.low_stock_threshold} ${escapeHtml(item.unit)}</strong></div></div></td>`;
+        row.after(detail);
+      };
+      row.addEventListener("click", handler);
+      return [row, handler] as const;
+    });
+    const orderHandlers = orderRows.map((row) => {
+      const handler = (event: Event) => {
+        if ((event.target as HTMLElement).closest("button, a")) return;
+        if (closeDetails(row)) return;
+        const order = transactions.find((candidate) => (candidate.reference_code || `PO-${candidate.id}`) === row.cells[0]?.textContent?.trim() && candidate.vendor_id != null);
+        if (!order) return;
+        const vendor = partners.find((partner) => partner.id === order.vendor_id);
+        const item = items.find((candidate) => candidate.id === order.item_id);
+        const detail = document.createElement("tr");
+        detail.className = "purchase-order-detail-row";
+        detail.innerHTML = `<td colSpan="8"><div class="inline-detail-grid"><div><span>Ghi chú</span><strong>${escapeHtml(order.note || "—")}</strong></div><div><span>Vendor</span><strong>${escapeHtml(vendor?.short_name || vendor?.legal_name || "—")}</strong></div><div><span>Nguyên liệu</span><strong>${escapeHtml(item?.name || String(order.item_id))}</strong></div><div><span>Chứng từ</span>${order.document_url ? `<a href="${escapeHtml(order.document_url)}" target="_blank" rel="noreferrer">Mở chứng từ</a>` : "<strong>—</strong>"}</div></div></td>`;
+        row.after(detail);
+      };
+      row.addEventListener("click", handler);
+      return [row, handler] as const;
+    });
+    return () => {
+      itemHandlers.forEach(([row, handler]) => { row.removeEventListener("click", handler); closeDetails(row); });
+      orderHandlers.forEach(([row, handler]) => { row.removeEventListener("click", handler); closeDetails(row); });
+    };
+  }, [items, transactions, partners, activeTab, warehouseTab]);
 
   const headers = (authToken = token) => ({ Authorization: `Bearer ${authToken}`, "Content-Type": "application/json" });
 
@@ -271,8 +324,7 @@ export default function Dashboard() {
 
    return <main className={`${activeTab === "settings" && settingsTab === "partners" ? "settings-partners" : ""} ${activeTab === "settings" && settingsTab === "company" ? "settings-company" : ""} ${activeTab === "settings" && settingsTab === "company" && companyTab === "history" ? "company-tab-history" : ""} ${activeTab === "warehouse" ? `warehouse-${warehouseTab}` : ""} ${showPartnerForm ? "partner-form-open" : ""}`}>
     <div className="topbar"><div><h1>VietMAS Admin</h1><div className="muted">AI hỗ trợ vận hành doanh nghiệp · Vai trò: {role}</div></div><button onClick={signOut}>Đăng xuất</button></div>
-    <div className="admin-tabs"><button className={activeTab === "users" ? "active" : ""} onClick={() => setActiveTab("users")} disabled={!canViewUsers}>Người dùng <span>{users.length}</span></button><button className={activeTab === "warehouse" ? "active" : ""} onClick={() => setActiveTab("warehouse")}>Mua hàng - Kho vận</button><button className={activeTab === "settings" ? "active" : ""} onClick={() => setActiveTab("settings")} disabled={!canViewSettings}>Cài đặt</button></div>
-    {activeTab === "warehouse" && <div className="warehouse-tabs"><button className={warehouseTab === "transactions" ? "active" : ""} onClick={() => setWarehouseTab("transactions")}>Đơn mua hàng</button><button className={warehouseTab === "inventory" ? "active" : ""} onClick={() => setWarehouseTab("inventory")}>Kho vận</button></div>}
+    <div className="admin-tabs"><button className={activeTab === "users" ? "active" : ""} onClick={() => setActiveTab("users")} disabled={!canViewUsers}>Người dùng <span>{users.length}</span></button><button className={activeTab === "warehouse" && warehouseTab === "transactions" ? "active" : ""} onClick={() => { setActiveTab("warehouse"); setWarehouseTab("transactions"); }}>Mua hàng</button><button className={activeTab === "warehouse" && warehouseTab === "inventory" ? "active" : ""} onClick={() => { setActiveTab("warehouse"); setWarehouseTab("inventory"); }}>Tồn kho</button><button className={activeTab === "settings" ? "active" : ""} onClick={() => setActiveTab("settings")} disabled={!canViewSettings}>Cài đặt</button></div>
     {activeTab === "settings" && canViewSettings && <div className="settings-tabs"><button className={settingsTab === "company" ? "active" : ""} onClick={() => setSettingsTab("company")}>Thông tin doanh nghiệp</button><button className={settingsTab === "partners" ? "active" : ""} onClick={() => setSettingsTab("partners")}>Đối tác <span>{partners.length}</span></button></div>}
     {activeTab === "settings" && settingsTab === "company" && <div className="settings-tabs company-tabs"><button className={companyTab === "info" ? "active" : ""} onClick={() => setCompanyTab("info")}>Thông tin doanh nghiệp</button><button className={companyTab === "history" ? "active" : ""} onClick={() => setCompanyTab("history")}>Lịch sử cập nhật</button></div>}
     {activeTab === "settings" && settingsTab === "partners" && <div className="settings-tabs partner-tabs"><button className={partnerTab === "list" ? "active" : ""} onClick={() => setPartnerTab("list")}>Danh sách đối tác</button><button className={partnerTab === "history" ? "active" : ""} onClick={() => setPartnerTab("history")}>Lịch sử thay đổi</button>{partnerTab === "list" && !editingPartner && canEdit && <button className="partner-add-button" onClick={() => setShowPartnerForm((open) => !open)}>{showPartnerForm ? "− Đóng form" : "+ Thêm đối tác"}</button>}</div>}
@@ -286,5 +338,6 @@ export default function Dashboard() {
 
     <section className="section stock-history-section"><h2>Lịch sử xuất nhập kho</h2><table><thead><tr><th>Thời gian</th><th>Sản phẩm</th><th>Loại</th><th>Số lượng</th><th>Ghi chú</th></tr></thead><tbody>{transactions.map((transaction) => <tr key={transaction.id}><td>{new Date(transaction.created_at).toLocaleString("vi-VN")}</td><td>{items.find((item) => item.id === transaction.item_id)?.name ?? transaction.item_id}</td><td>{transaction.transaction_type === "import" ? "Nhập kho" : transaction.transaction_type === "export" ? "Xuất kho" : "Điều chỉnh"}</td><td>{transaction.quantity}</td><td>{transaction.note}</td></tr>)}</tbody></table></section>
     </>}
+    {(selectedItem || selectedPurchaseOrder) && <div className="detail-backdrop" role="presentation" onClick={() => { setSelectedItem(null); setSelectedPurchaseOrder(null); }}><section className="detail-card" role="dialog" aria-modal="true" aria-labelledby="detail-title" onClick={(event) => event.stopPropagation()}><div className="detail-card-header"><h2 id="detail-title">{selectedItem ? selectedItem.name : "Chi tiết đơn mua hàng"}</h2><button type="button" className="detail-close" onClick={() => { setSelectedItem(null); setSelectedPurchaseOrder(null); }} aria-label="Đóng">×</button></div>{selectedItem && <div className="detail-grid"><div><span>SKU</span><strong>{selectedItem.sku}</strong></div><div><span>Nhóm</span><strong>{selectedItem.category === "raw_material" ? "Nguyên liệu" : "Thành phẩm"}</strong></div><div><span>Tồn</span><strong>{selectedItem.quantity} {selectedItem.unit}</strong></div><div><span>Cảnh báo</span><strong>{selectedItem.quantity <= selectedItem.low_stock_threshold ? "Sắp hết" : "Bình thường"}</strong></div><div className="detail-wide"><span>Ghi chú</span><strong>{selectedItem.packaging_note || "—"}</strong></div></div>}{selectedPurchaseOrder && <div className="detail-grid"><div><span>Mã đơn hàng</span><strong>{selectedPurchaseOrder.reference_code || `PO-${selectedPurchaseOrder.id}`}</strong></div><div><span>Vendor</span><strong>{partners.find((partner) => partner.id === selectedPurchaseOrder.vendor_id)?.short_name || partners.find((partner) => partner.id === selectedPurchaseOrder.vendor_id)?.legal_name || "—"}</strong></div><div><span>Nguyên liệu</span><strong>{items.find((item) => item.id === selectedPurchaseOrder.item_id)?.name || selectedPurchaseOrder.item_id}</strong></div><div><span>Số lượng</span><strong>{selectedPurchaseOrder.quantity}</strong></div><div><span>Trạng thái</span><strong>{({ draft: "Nháp", ordered: "Đã đặt hàng", partially_received: "Nhận một phần", received: "Đã nhận đủ", cancelled: "Đã hủy" } as Record<string, string>)[selectedPurchaseOrder.order_status || "draft"] || "Nháp"}</strong></div><div><span>Ngày tạo</span><strong>{new Date(selectedPurchaseOrder.created_at).toLocaleString("vi-VN")}</strong></div><div className="detail-wide"><span>Ghi chú</span><strong>{selectedPurchaseOrder.note || "—"}</strong></div>{selectedPurchaseOrder.document_url && <div className="detail-wide"><span>Chứng từ</span><a href={selectedPurchaseOrder.document_url} target="_blank" rel="noreferrer">Mở chứng từ</a></div>}</div>}</section></div>}
   </main>;
 }
