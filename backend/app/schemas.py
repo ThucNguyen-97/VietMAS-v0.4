@@ -81,9 +81,20 @@ class PartnerBase(BaseModel):
     partner_type: PartnerType
     tax_code: str = Field(min_length=1, max_length=30)
     legal_representative: str | None = Field(default=None, max_length=160)
+    representative_title: str | None = Field(default=None, max_length=120)
     address: str | None = None
+    delivery_address: str | None = None
     phone: str | None = Field(default=None, max_length=30)
     email: str | None = Field(default=None, max_length=160)
+    bank_name: str | None = Field(default=None, max_length=255)
+    bank_account_name: str | None = Field(default=None, max_length=160)
+    bank_account_number: str | None = Field(default=None, max_length=50)
+    contract_no: str | None = Field(default=None, max_length=80)
+    contract_effective_date: str | None = Field(default=None, max_length=20)
+    contract_expired_date: str | None = Field(default=None, max_length=20)
+    credit_days: int | None = Field(default=None, ge=0)
+    credit_limit: str | None = Field(default=None, max_length=80)
+    deposit_percent: str | None = Field(default=None, max_length=20)
     logo_url: str | None = Field(default=None, max_length=500)
     status: PartnerStatus = PartnerStatus.ACTIVE
     supply_item_ids: list[int] = Field(default_factory=list)

@@ -71,6 +71,23 @@ def startup() -> None:
         for column_name, statement in migrations.items():
             if column_name not in existing_columns:
                 connection.execute(text(statement))
+        partner_columns = {column["name"] for column in inspect(engine).get_columns("partners")}
+        partner_migrations = {
+            "representative_title": "ALTER TABLE partners ADD COLUMN representative_title VARCHAR(120)",
+            "delivery_address": "ALTER TABLE partners ADD COLUMN delivery_address TEXT",
+            "bank_name": "ALTER TABLE partners ADD COLUMN bank_name VARCHAR(255)",
+            "bank_account_name": "ALTER TABLE partners ADD COLUMN bank_account_name VARCHAR(160)",
+            "bank_account_number": "ALTER TABLE partners ADD COLUMN bank_account_number VARCHAR(50)",
+            "contract_no": "ALTER TABLE partners ADD COLUMN contract_no VARCHAR(80)",
+            "contract_effective_date": "ALTER TABLE partners ADD COLUMN contract_effective_date VARCHAR(20)",
+            "contract_expired_date": "ALTER TABLE partners ADD COLUMN contract_expired_date VARCHAR(20)",
+            "credit_days": "ALTER TABLE partners ADD COLUMN credit_days INTEGER",
+            "credit_limit": "ALTER TABLE partners ADD COLUMN credit_limit VARCHAR(80)",
+            "deposit_percent": "ALTER TABLE partners ADD COLUMN deposit_percent VARCHAR(20)",
+        }
+        for column_name, statement in partner_migrations.items():
+            if column_name not in partner_columns:
+                connection.execute(text(statement))
         history_columns = {column["name"] for column in inspect(engine).get_columns("purchase_order_history")}
         if "previous_snapshot_json" not in history_columns:
             connection.execute(text("ALTER TABLE purchase_order_history ADD COLUMN previous_snapshot_json TEXT DEFAULT '{}'"))
@@ -477,8 +494,8 @@ def get_inventory(item_id: int, db: Session = Depends(get_db), _: object = Depen
 
 def partner_response(partner: Partner) -> dict:
     return {**{key: getattr(partner, key) for key in (
-        "id", "legal_name", "short_name", "partner_type", "tax_code", "legal_representative", "address",
-        "phone", "email", "logo_url", "status", "created_by_id", "created_at", "updated_at")},
+        "id", "legal_name", "short_name", "partner_type", "tax_code", "legal_representative", "representative_title", "address", "delivery_address",
+        "phone", "email", "bank_name", "bank_account_name", "bank_account_number", "contract_no", "contract_effective_date", "contract_expired_date", "credit_days", "credit_limit", "deposit_percent", "logo_url", "status", "created_by_id", "created_at", "updated_at")},
         "supply_item_ids": [s.inventory_item_id for s in partner.supplies]}
 
 
