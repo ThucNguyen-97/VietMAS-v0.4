@@ -154,10 +154,31 @@ class InventoryTransaction(Base):
     quantity: Mapped[int] = mapped_column(Integer)
     note: Mapped[str] = mapped_column(Text, default="")
     reference_code: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    vendor_id: Mapped[int | None] = mapped_column(ForeignKey("partners.id"), nullable=True, index=True)
+    document_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    order_status: Mapped[str] = mapped_column(String(30), default="draft", index=True)
     created_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     item: Mapped[InventoryItem] = relationship(back_populates="transactions")
     created_by: Mapped[User] = relationship(back_populates="transactions")
+
+
+class PurchaseOrderHistory(Base):
+    __tablename__ = "purchase_order_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(index=True)
+    action: Mapped[str] = mapped_column(String(20), index=True)
+    changed_by_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    snapshot_json: Mapped[str] = mapped_column(Text)
+    previous_snapshot_json: Mapped[str] = mapped_column(Text, default="{}")
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+    def snapshot(self) -> dict:
+        return json.loads(self.snapshot_json)
+
+    def previous_snapshot(self) -> dict:
+        return json.loads(self.previous_snapshot_json or "{}")
 
 
 class Conversation(Base):

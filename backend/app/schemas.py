@@ -109,8 +109,11 @@ class TransactionCreate(BaseModel):
     item_id: int
     transaction_type: TransactionType
     quantity: int = Field(gt=0)
-    note: str = Field(min_length=1)
+    note: str = ""
     reference_code: str | None = None
+    vendor_id: int | None = None
+    document_url: str | None = Field(default=None, max_length=500)
+    order_status: str = Field(default="draft", pattern="^(draft|ordered|partially_received|received|cancelled)$")
 
 
 class TransactionResponse(BaseModel):
@@ -121,8 +124,31 @@ class TransactionResponse(BaseModel):
     quantity: int
     note: str
     reference_code: str | None
+    vendor_id: int | None
+    document_url: str | None
+    order_status: str
     created_by_id: int
     created_at: datetime
+
+
+class PurchaseOrderUpdate(BaseModel):
+    vendor_id: int
+    item_id: int
+    quantity: int = Field(gt=0)
+    note: str = ""
+    document_url: str | None = Field(default=None, max_length=500)
+    order_status: str = Field(pattern="^(draft|ordered|partially_received|received|cancelled)$")
+
+
+class PurchaseOrderHistoryResponse(BaseModel):
+    id: int
+    order_id: int
+    action: str
+    changed_by_id: int
+    changed_by_name: str
+    changed_at: datetime
+    previous_snapshot: dict
+    snapshot: dict
 
 
 class ChatRequest(BaseModel):

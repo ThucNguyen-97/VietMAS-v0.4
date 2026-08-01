@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import func, inspect, select, text
 from sqlalchemy.orm import Session
 
 from .auth import current_user, login, require_roles, seed_users
@@ -15,6 +15,7 @@ from .models import (
     InventoryCategory,
     InventoryItem,
     InventoryTransaction,
+    PurchaseOrderHistory,
     Message,
     Partner,
     PartnerSupply,
@@ -24,6 +25,7 @@ from .models import (
     Role,
     TransactionType,
     User,
+    utcnow,
 )
 from .schemas import (
     ChatRequest,
@@ -38,6 +40,8 @@ from .schemas import (
     LoginResponse,
     TransactionCreate,
     TransactionResponse,
+    PurchaseOrderUpdate,
+    PurchaseOrderHistoryResponse,
     UserResponse,
     PartnerBase,
     PartnerResponse,
@@ -57,6 +61,19 @@ app.add_middleware(
 @app.on_event("startup")
 def startup() -> None:
     Base.metadata.create_all(bind=engine)
+    with engine.begin() as connection:
+        existing_columns = {column["name"] for column in inspect(engine).get_columns("inventory_transactions")}
+        migrations = {
+            "vendor_id": "ALTER TABLE inventory_transactions ADD COLUMN vendor_id INTEGER",
+            "document_url": "ALTER TABLE inventory_transactions ADD COLUMN document_url VARCHAR(500)",
+            "order_status": "ALTER TABLE inventory_transactions ADD COLUMN order_status VARCHAR(30) DEFAULT 'draft'",
+        }
+        for column_name, statement in migrations.items():
+            if column_name not in existing_columns:
+                connection.execute(text(statement))
+        history_columns = {column["name"] for column in inspect(engine).get_columns("purchase_order_history")}
+        if "previous_snapshot_json" not in history_columns:
+            connection.execute(text("ALTER TABLE purchase_order_history ADD COLUMN previous_snapshot_json TEXT DEFAULT '{}'"))
     with SessionLocal() as db:
         seed_users(db)
         if not db.scalar(select(InventoryItem).where(InventoryItem.sku == "RM-SALT")):
@@ -225,7 +242,7 @@ def list_inventory(
 def create_inventory(
     payload: InventoryCreate,
     db: Session = Depends(get_db),
-    _: object = Depends(require_roles(Role.ADMIN, Role.CEO, Role.MANAGER)),
+    user=Depends(require_roles(Role.ADMIN, Role.CEO, Role.MANAGER)),
 ):
     if db.scalar(select(InventoryItem).where(InventoryItem.sku == payload.sku)):
         raise HTTPException(409, "SKU đã tồn tại")
@@ -270,20 +287,37 @@ def create_transaction(
     user=Depends(require_roles(Role.ADMIN, Role.CEO, Role.MANAGER)),
 ):
     item = db.get(InventoryItem, payload.item_id)
+    if payload.vendor_id is not None:
+        vendor = db.get(Partner, payload.vendor_id)
+        if not vendor or vendor.partner_type != PartnerType.VENDOR or vendor.status != PartnerStatus.ACTIVE:
+            raise HTTPException(400, "Vendor khĂ´ng há»£p lá»‡ hoáº·c Ä‘Ă£ ngá»«ng hoáº¡t Ä‘á»™ng")
+        if not any(supply.inventory_item_id == payload.item_id for supply in vendor.supplies):
+            raise HTTPException(400, "NguyĂªn liá»‡u khĂ´ng náº±m trong danh má»¥c Vendor cung cáº¥p")
     if not item or not item.is_active:
         raise HTTPException(404, "Không tìm thấy sản phẩm")
     if payload.transaction_type == TransactionType.ADJUSTMENT and user.role != Role.ADMIN:
         raise HTTPException(403, "Chỉ Admin được điều chỉnh tồn kho")
     if payload.transaction_type == TransactionType.EXPORT and payload.quantity > item.quantity:
         raise HTTPException(400, "Không thể xuất vượt số lượng tồn kho")
-    if payload.transaction_type == TransactionType.IMPORT:
+    should_update_stock = payload.vendor_id is None or payload.order_status in ("partially_received", "received")
+    if payload.transaction_type == TransactionType.IMPORT and should_update_stock:
         item.quantity += payload.quantity
     elif payload.transaction_type == TransactionType.EXPORT:
         item.quantity -= payload.quantity
-    else:
+    elif payload.transaction_type == TransactionType.ADJUSTMENT:
         item.quantity = payload.quantity
-    transaction = InventoryTransaction(**payload.model_dump(), created_by_id=user.user_id)
+    transaction = InventoryTransaction(**payload.model_dump(exclude={"reference_code"}), created_by_id=user.user_id)
     db.add(transaction)
+    db.flush()
+    if payload.vendor_id is not None:
+        transaction.reference_code = f"PO-{utcnow().year}-{transaction.id:04d}"
+        db.add(PurchaseOrderHistory(
+            order_id=transaction.id,
+            action="created",
+            changed_by_id=user.user_id,
+            previous_snapshot_json=json.dumps({}),
+            snapshot_json=json.dumps({**payload.model_dump(), "reference_code": transaction.reference_code}, default=str),
+        ))
     db.commit()
     db.refresh(transaction)
     return transaction
@@ -292,6 +326,145 @@ def create_transaction(
 @app.get("/inventory/transactions", response_model=list[TransactionResponse])
 def list_transactions(db: Session = Depends(get_db), _: object = Depends(current_user)):
     return list(db.scalars(select(InventoryTransaction).order_by(InventoryTransaction.created_at.desc())).all())
+
+
+@app.get("/inventory/transactions/next-code")
+def next_purchase_order_code(db: Session = Depends(get_db), _: object = Depends(current_user)):
+    last_id = db.scalar(select(func.max(InventoryTransaction.id))) or 0
+    return {"code": f"PO-{utcnow().year}-{last_id + 1:04d}"}
+
+
+@app.put("/inventory/purchase-orders/{order_id}", response_model=TransactionResponse)
+def update_purchase_order(
+    order_id: int,
+    payload: PurchaseOrderUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles(Role.ADMIN, Role.CEO, Role.MANAGER)),
+):
+    order = db.get(InventoryTransaction, order_id)
+    if not order or order.vendor_id is None or order.transaction_type != TransactionType.IMPORT:
+        raise HTTPException(404, "KhĂ´ng tĂ¬m tháº¥y Ä‘Æ¡n mua hĂ ng")
+    vendor = db.get(Partner, payload.vendor_id)
+    new_item = db.get(InventoryItem, payload.item_id)
+    if not vendor or vendor.partner_type != PartnerType.VENDOR or vendor.status != PartnerStatus.ACTIVE:
+        raise HTTPException(400, "Vendor khĂ´ng há»£p lá»‡ hoáº·c Ä‘Ă£ ngá»«ng hoáº¡t Ä‘á»™ng")
+    if not new_item or not new_item.is_active or not any(supply.inventory_item_id == new_item.id for supply in vendor.supplies):
+        raise HTTPException(400, "NguyĂªn liá»‡u khĂ´ng náº±m trong danh má»¥c Vendor cung cáº¥p")
+    old_item = db.get(InventoryItem, order.item_id)
+    previous_snapshot = {
+        "reference_code": order.reference_code,
+        "vendor_id": order.vendor_id,
+        "item_id": order.item_id,
+        "quantity": order.quantity,
+        "note": order.note,
+        "document_url": order.document_url,
+        "order_status": order.order_status,
+    }
+    old_received = order.order_status in ("partially_received", "received")
+    new_received = payload.order_status in ("partially_received", "received")
+    if old_received and new_received:
+        if old_item.id == new_item.id:
+            delta = payload.quantity - order.quantity
+            if delta < 0 and old_item.quantity < -delta:
+                raise HTTPException(400, "KhĂ´ng thá»ƒ giáº£m sá»‘ lÆ°á»£ng vÆ°á»£t quá»n kho hiá»‡n táº¡i")
+            old_item.quantity += delta
+        else:
+            if old_item.quantity < order.quantity:
+                raise HTTPException(400, "KhĂ´ng thá»ƒ chuyá»ƒn nguyĂªn liá»‡u vĂ¬ tá»“n kho khĂ´ng Ä‘á»§")
+            old_item.quantity -= order.quantity
+            new_item.quantity += payload.quantity
+    elif old_received:
+        if old_item.quantity < order.quantity:
+            raise HTTPException(400, "KhĂ´ng thá»ƒ há»§y nháº­n hĂ ng vĂ¬ tá»“n kho khĂ´ng Ä‘á»§")
+        old_item.quantity -= order.quantity
+    elif new_received:
+        new_item.quantity += payload.quantity
+    order.vendor_id = payload.vendor_id
+    order.item_id = payload.item_id
+    order.quantity = payload.quantity
+    order.note = payload.note
+    order.document_url = payload.document_url
+    order.order_status = payload.order_status
+    db.add(PurchaseOrderHistory(
+        order_id=order.id,
+        action="updated",
+        changed_by_id=user.user_id,
+        previous_snapshot_json=json.dumps(previous_snapshot, default=str),
+        snapshot_json=json.dumps({
+            "reference_code": order.reference_code,
+            "vendor_id": order.vendor_id,
+            "item_id": order.item_id,
+            "quantity": order.quantity,
+            "note": order.note,
+            "document_url": order.document_url,
+            "order_status": order.order_status,
+        }, default=str),
+    ))
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+@app.delete("/inventory/purchase-orders/{order_id}")
+def delete_purchase_order(
+    order_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(require_roles(Role.ADMIN, Role.CEO, Role.MANAGER)),
+):
+    order = db.get(InventoryTransaction, order_id)
+    if not order or order.vendor_id is None or order.transaction_type != TransactionType.IMPORT:
+        raise HTTPException(404, "KhĂ´ng tĂ¬m tháº¥y Ä‘Æ¡n mua hĂ ng")
+    if order.order_status in ("partially_received", "received"):
+        item = db.get(InventoryItem, order.item_id)
+        if item.quantity < order.quantity:
+            raise HTTPException(400, "KhĂ´ng thá»ƒ xĂ³a Ä‘Æ¡n vĂ¬ tá»“n kho khĂ´ng Ä‘á»§ Ä‘á»ƒ hoĂ n táº¡i")
+        item.quantity -= order.quantity
+    db.add(PurchaseOrderHistory(
+        order_id=order.id,
+        action="deleted",
+        changed_by_id=user.user_id,
+        previous_snapshot_json=json.dumps({
+            "reference_code": order.reference_code,
+            "vendor_id": order.vendor_id,
+            "item_id": order.item_id,
+            "quantity": order.quantity,
+            "note": order.note,
+            "document_url": order.document_url,
+            "order_status": order.order_status,
+        }, default=str),
+        snapshot_json=json.dumps({
+            "reference_code": order.reference_code,
+            "vendor_id": order.vendor_id,
+            "item_id": order.item_id,
+            "quantity": order.quantity,
+            "note": order.note,
+            "document_url": order.document_url,
+            "order_status": order.order_status,
+        }, default=str),
+    ))
+    db.delete(order)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@app.get("/inventory/purchase-orders/history", response_model=list[PurchaseOrderHistoryResponse])
+def list_purchase_order_history(db: Session = Depends(get_db), _: object = Depends(current_user)):
+    entries = db.scalars(select(PurchaseOrderHistory).order_by(PurchaseOrderHistory.changed_at.desc())).all()
+    user_ids = {entry.changed_by_id for entry in entries}
+    users_by_id = {user.id: user.display_name for user in db.scalars(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+    return [
+        {
+            "id": entry.id,
+            "order_id": entry.order_id,
+            "action": entry.action,
+            "changed_by_id": entry.changed_by_id,
+            "changed_by_name": users_by_id.get(entry.changed_by_id, f"#{entry.changed_by_id}"),
+            "changed_at": entry.changed_at,
+            "previous_snapshot": entry.previous_snapshot(),
+            "snapshot": entry.snapshot(),
+        }
+        for entry in db.scalars(select(PurchaseOrderHistory).order_by(PurchaseOrderHistory.changed_at.desc())).all()
+    ]
 
 
 @app.get("/inventory/{item_id}", response_model=InventoryResponse)
