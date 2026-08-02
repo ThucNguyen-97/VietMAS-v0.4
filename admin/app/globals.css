@@ -2,6 +2,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; }
 main { max-width: 1180px; margin: 0 auto; padding: 32px 20px; }
+.admin-screen { max-width: none; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); padding: 24px 28px; }
 .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .muted { color: #6b7280; }
 .card { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px; box-shadow: 0 2px 8px #1720330a; }
@@ -38,6 +39,63 @@ th { background: #f8fafc; }
 .admin-tabs button.active { color: #172033; border-bottom-color: #172033; font-weight: 700; }
 .admin-tabs button:disabled { opacity: .45; cursor: not-allowed; }
 .admin-tabs span { background: #eef2f7; border-radius: 12px; padding: 2px 7px; font-size: 12px; margin-left: 4px; }
+.accounting-panel { margin-top: 24px; }
+.accounting-toolbar { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 20px; }
+.accounting-eyebrow { margin: 0 0 6px; color: #64748b; font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+.accounting-toolbar h2 { margin: 0; font-size: 28px; }
+.accounting-toolbar p { margin: 6px 0 0; }
+.accounting-actions { display: flex; gap: 8px; align-items: center; }
+.accounting-actions button.secondary { background: white; color: #172033; border: 1px solid #d1d5db; }
+.accounting-period { display: flex; align-items: end; gap: 8px; }
+.accounting-period label { font-size: 12px; color: #64748b; }
+.accounting-period select { min-width: 150px; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: white; color: #172033; font: inherit; }
+.accounting-status { display: flex; align-items: center; gap: 8px; padding: 12px 14px; margin-bottom: 20px; border: 1px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; color: #166534; font-size: 14px; }
+.accounting-status-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+.accounting-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+.accounting-metric { padding: 18px; border: 1px solid #e5e7eb; border-radius: 12px; background: white; box-shadow: 0 2px 8px #1720330a; }
+.accounting-metric span { color: #64748b; font-size: 13px; }
+.accounting-metric strong { display: block; margin-top: 8px; font-size: 24px; }
+.accounting-metric small { display: block; margin-top: 6px; color: #64748b; }
+.accounting-report { padding: 22px; border: 1px solid #e5e7eb; border-radius: 12px; background: white; box-shadow: 0 2px 8px #1720330a; }
+.accounting-report-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 16px; }
+.accounting-report-header h3 { margin: 0; font-size: 19px; }
+.accounting-report-header p { margin: 5px 0 0; color: #64748b; font-size: 13px; }
+.accounting-report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.accounting-column { min-width: 0; }
+.accounting-column h4 { margin: 0; padding: 12px 14px; border: 1px solid #e5e7eb; border-bottom: 0; border-radius: 10px 10px 0 0; background: #f8fafc; font-size: 14px; }
+.accounting-column table { border: 1px solid #e5e7eb; border-radius: 0 0 10px 10px; }
+.accounting-column th, .accounting-column td { padding: 12px 14px; }
+.accounting-column th:last-child, .accounting-column td:last-child { text-align: right; white-space: nowrap; }
+.accounting-column tbody tr:last-child td { border-bottom: 0; }
+.accounting-total td { font-weight: 700; background: #f8fafc; }
+.accounting-note { margin: 16px 0 0; color: #64748b; font-size: 13px; }
+@media (max-width: 800px) { .accounting-toolbar, .accounting-report-header { align-items: stretch; flex-direction: column; } .accounting-actions, .accounting-period { flex-wrap: wrap; } .accounting-metrics, .accounting-report-grid { grid-template-columns: 1fr; } }
+.accounting-grid-panel { margin-top: 24px; border: 1px solid #dfe5ec; background: white; box-shadow: 0 2px 8px #1720330a; }
+main.accounting-screen { max-width: none !important; width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); padding: 24px 28px; }
+.accounting-grid-toolbar { display: flex; align-items: center; gap: 28px; min-height: 68px; padding: 12px 16px; border-bottom: 1px solid #dfe5ec; }
+.accounting-grid-toolbar > select { width: 200px; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #334155; font: inherit; font-style: italic; }
+.accounting-grid-field { display: flex; align-items: center; gap: 8px; color: #64748b; white-space: nowrap; }
+.accounting-grid-field input { width: 64px; padding: 8px 10px; border-color: #cbd5e1; border-radius: 6px; text-align: center; color: #172033; background: white; }
+.accounting-grid-field input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+.accounting-grid-tools { display: flex; gap: 8px; margin-left: auto; }
+.accounting-grid-tools button { min-width: 34px; padding: 7px 9px; border: 1px solid #dbe3ec; border-radius: 6px; background: white; color: #2673b9; }
+.accounting-grid-tools button:hover { background: #eff6ff; }
+.accounting-grid-wrap { overflow-x: auto; }
+main.accounting-screen .accounting-grid-table { width: 100%; min-width: 1120px; table-layout: fixed; border-radius: 0; font-size: 14px; }
+.accounting-grid-table th, .accounting-grid-table td { height: 27px; padding: 4px 12px; border-right: 1px solid #e5eaf0; border-bottom: 1px solid #e5eaf0; white-space: nowrap; }
+main.accounting-screen .accounting-grid-table td:first-child { height: auto; white-space: normal !important; overflow-wrap: anywhere !important; word-break: normal; line-height: 1.35; }
+.accounting-grid-table td:nth-child(2) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.accounting-grid-table th { height: 34px; background: #fafafa; color: #111827; font-weight: 700; }
+.accounting-grid-table th:first-child, .accounting-grid-table td:first-child { width: 34%; }
+.accounting-grid-table th:nth-child(2), .accounting-grid-table td:nth-child(2) { width: 12%; }
+.accounting-grid-table th:nth-child(n+3), .accounting-grid-table td:nth-child(n+3) { width: 13.5%; text-align: right; }
+.accounting-grid-table tr:hover td { background: #f8fbff; }
+.accounting-grid-table .accounting-grid-section td { font-weight: 700; color: #172033; }
+.accounting-grid-table .level-1 td { font-weight: 600; }
+.accounting-grid-table .level-3 td:first-child { color: #334155; }
+.accounting-chevron, .accounting-chevron-spacer { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-right: 5px; padding: 0; border: 0; background: transparent; color: #172033; font-size: 17px; line-height: 1; vertical-align: middle; }
+.accounting-chevron:hover { background: #eaf2fb; }
+@media (max-width: 900px) { .accounting-grid-toolbar { flex-wrap: wrap; gap: 10px 16px; } .accounting-grid-tools { margin-left: 0; } }
 .warehouse-tabs { display: flex; gap: 8px; margin: 0 0 20px; }
 .warehouse-tabs button { background: white; color: #6b7280; border: 1px solid #e5e7eb; }
 .warehouse-tabs button.active { background: #172033; color: white; }
