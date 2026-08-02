@@ -125,7 +125,7 @@ class TransactionCreate(BaseModel):
     reference_code: str | None = None
     vendor_id: int | None = None
     document_url: str | None = Field(default=None, max_length=500)
-    order_status: str = Field(default="draft", pattern="^(draft|ordered|partially_received|received|cancelled)$")
+    order_status: str = Field(default="awaiting_quote", pattern="^(awaiting_quote|awaiting_po|po_confirmation|deposit_payment|shipping|qc|stocked|pinv|balance_payment|completed|draft|ordered|partially_received|received|cancelled)$")
 
 
 class TransactionResponse(BaseModel):
@@ -149,7 +149,7 @@ class PurchaseOrderUpdate(BaseModel):
     quantity: int = Field(gt=0)
     note: str = ""
     document_url: str | None = Field(default=None, max_length=500)
-    order_status: str = Field(pattern="^(draft|ordered|partially_received|received|cancelled)$")
+    order_status: str = Field(pattern="^(awaiting_quote|awaiting_po|po_confirmation|deposit_payment|shipping|qc|stocked|pinv|balance_payment|completed|draft|ordered|partially_received|received|cancelled)$")
 
 
 class PurchaseOrderHistoryResponse(BaseModel):
